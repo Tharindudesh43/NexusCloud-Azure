@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nexus Cloud | Storage</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.3);
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --danger: #ef4444;
+            --success: #22c55e;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(56, 189, 248, 0.1) 0px, transparent 50%);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .dashboard {
+            width: 100%;
+            max-width: 1000px;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 25px;
+        }
+
+        /* Sidebar / Upload Controls */
+        .sidebar {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 30px;
+            height: fit-content;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-bottom: 40px;
+            color: var(--accent);
+        }
+
+        .dropzone {
+            border: 2px dashed rgba(56, 189, 248, 0.3);
+            border-radius: 16px;
+            padding: 25px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: 0.3s;
+            background: rgba(15, 23, 42, 0.5);
+        }
+
+        .dropzone:hover { border-color: var(--accent); background: rgba(56, 189, 248, 0.05); }
+        .dropzone i { font-size: 1.8rem; color: var(--accent); margin-bottom: 10px; }
+
+        #selected-file-info {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            text-align: center;
+            display: none;
+        }
+
+        .primary-btn {
+            width: 100%;
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            padding: 12px;
+            border-radius: 12px;
+            font-weight: 700;
+            margin-top: 20px;
+            cursor: pointer;
+            display: none; /* Only show when file is picked */
+            transition: 0.2s;
+        }
+
+        .primary-btn:hover { transform: scale(1.02); box-shadow: 0 0 15px var(--accent-glow); }
+
+        /* Main Panel */
+        .main-panel {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 30px;
+        }
+
+        .file-item {
+            background: rgba(15, 23, 42, 0.4);
+            padding: 15px 20px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .btn-group { display: flex; gap: 8px; }
+        .action-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+            transition: 0.2s;
+        }
+
+        .btn-view { background: rgba(56, 189, 248, 0.1); color: var(--accent); }
+        .btn-del { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+        .btn-view:hover { background: var(--accent); color: white; }
+        .btn-del:hover { background: var(--danger); color: white; }
+
+        /* Custom Delete Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal {
+            background: #1e293b;
+            padding: 30px;
+            border-radius: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+            width: 90%;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .modal-btns { display: flex; gap: 10px; margin-top: 25px; }
+        .modal-btn { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: 600; cursor: pointer; }
+        .btn-cancel { background: #334155; color: white; }
+        .btn-confirm { background: var(--danger); color: white; }
+
+        /* Progress Bar */
+        .progress-box { margin-top: 15px; display: none; }
+        .track { height: 6px; background: rgba(255,255,255,0.1); border-radius: 10px; overflow: hidden; }
+        .fill { height: 100%; width: 0%; background: var(--accent); transition: 0.3s; }
+    </style>
+</head>
+<body>
+
+<div class="dashboard">
+    <aside class="sidebar">
+        <div class="brand"><i class="fa-solid fa-bolt"></i> NEXUS</div>
+        
+        <div class="dropzone" onclick="document.getElementById('fileInput').click()">
+            <i class="fa-solid fa-file-circle-plus"></i>
+            <p>Pick a file</p>
+        </div>
+        <input type="file" id="fileInput" hidden onchange="handleFileSelect(this.files[0])">
+
+        <div id="selected-file-info">
+            <i class="fa-solid fa-paperclip"></i> <span id="fn"></span>
+        </div>
+
+        <button class="primary-btn" id="uploadBtn" onclick="performUpload()">
+            <i class="fa-solid fa-arrow-up-from-bracket"></i> Upload Now
+        </button>
+
+        <div class="progress-box" id="pbox">
+            <div class="track"><div class="fill" id="pbar"></div></div>
+            <p id="stat" style="font-size:12px; color:var(--accent); text-align:center;"></p>
+        </div>
+    </aside>
+
+    <main class="main-panel">
+        <h3 style="margin-top:0;">Your Vault</h3>
+        <div id="fileList"></div>
+    </main>
+</div>
+
+<div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+        <i class="fa-solid fa-triangle-exclamation" style="font-size: 3rem; color: var(--danger); margin-bottom: 15px;"></i>
+        <h3>Delete File?</h3>
+        <p style="color: var(--text-dim);">This action is permanent and cannot be undone.</p>
+        <div class="modal-btns">
+            <button class="modal-btn btn-cancel" onclick="closeModal()">Cancel</button>
+            <button class="modal-btn btn-confirm" id="confirmDelBtn">Delete</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const accountName = "websitestoragetdh";
+    const containerName = "files";
+    const containerUrl = `https://${accountName}.blob.core.windows.net/${containerName}`;
+    const sasToken = "sv=2025-11-05&ss=bfqt&srt=sco&sp=rwdlacupiytfx&se=2026-04-30T00:40:40Z&st=2026-04-29T16:25:40Z&spr=https,http&sig=j7OvQ9iyebucePsVK6o62vPoi1iSr1CzpY7WWFSdofY%3D";
+    const getSas = () => sasToken.startsWith('?') ? sasToken : `?${sasToken}`;
+
+    let selectedFile = null;
+    let fileToDelete = null;
+
+    function handleFileSelect(file) {
+        if (!file) return;
+        selectedFile = file;
+        document.getElementById('fn').innerText = file.name;
+        document.getElementById('selected-file-info').style.display = 'block';
+        document.getElementById('uploadBtn').style.display = 'block';
+    }
+
+    function performUpload() {
+        if (!selectedFile) return;
+        const bar = document.getElementById("pbar");
+        const box = document.getElementById("pbox");
+        const stat = document.getElementById("stat");
+        const btn = document.getElementById("uploadBtn");
+
+        box.style.display = 'block';
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+
+        const url = `${containerUrl}/${encodeURIComponent(selectedFile.name)}${getSas()}`;
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", url, true);
+        xhr.setRequestHeader("x-ms-blob-type", "BlockBlob");
+
+        xhr.upload.onprogress = (e) => {
+            let p = (e.loaded / e.total) * 100;
+            bar.style.width = p + "%";
+            stat.innerText = `Syncing: ${Math.round(p)}%`;
+        };
+
+        xhr.onload = () => {
+            if (xhr.status === 201) {
+                stat.innerText = "Success!";
+                setTimeout(() => {
+                    box.style.display = 'none';
+                    btn.style.display = 'none';
+                    document.getElementById('selected-file-info').style.display = 'none';
+                    btn.disabled = false; btn.style.opacity = '1';
+                }, 2000);
+                loadFiles();
+            }
+        };
+        xhr.send(selectedFile);
+    }
+
+    async function loadFiles() {
+        const listUrl = `${containerUrl}${getSas()}&restype=container&comp=list`;
+        try {
+            const res = await fetch(listUrl);
+            const xml = new DOMParser().parseFromString(await res.text(), "text/xml");
+            const blobs = xml.getElementsByTagName("Blob");
+            const container = document.getElementById("fileList");
+            container.innerHTML = "";
+
+            for (let b of blobs) {
+                let name = b.getElementsByTagName("Name")[0].textContent;
+                let url = `${containerUrl}/${encodeURIComponent(name)}${getSas()}`;
+                container.innerHTML += `
+                    <div class="file-item">
+                        <span>${name}</span>
+                        <div class="btn-group">
+                            <a href="${url}" target="_blank" class="action-btn btn-view"><i class="fa-solid fa-eye"></i></a>
+                            <button onclick="promptDelete('${name}')" class="action-btn btn-del"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>`;
+            }
+        } catch (e) { console.error("Load failed"); }
+    }
+
+    function promptDelete(name) {
+        fileToDelete = name;
+        document.getElementById('deleteModal').style.display = 'flex';
+        document.getElementById('confirmDelBtn').onclick = executeDelete;
+    }
+
+    function closeModal() {
+        document.getElementById('deleteModal').style.display = 'none';
+    }
+
+    async function executeDelete() {
+        const url = `${containerUrl}/${encodeURIComponent(fileToDelete)}${getSas()}`;
+        try {
+            const res = await fetch(url, { method: "DELETE" });
+            if (res.ok) loadFiles();
+        } finally { closeModal(); }
+    }
+
+    loadFiles();
+</script>
+</body>
+</html>
